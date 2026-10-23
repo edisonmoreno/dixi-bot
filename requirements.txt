@@ -1,0 +1,9 @@
+# SDK de OpenAI (Abstraer modelos que usen este SDK)
+openai>=1.0.0
+
+# Datos
+pandas
+openpyxl          # leer/escribir Excel
+
+# Configuración (lee el archivo .env)
+pydantic-settings
