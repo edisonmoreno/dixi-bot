@@ -1,20 +1,23 @@
 """Chat API controller."""
-import os
-from app.application.use_cases.find_tenant_use_case import FindTenantUseCase
-from app.infrastructure.respositories.tenant_repository_adapter import TenantRepositoryAdapter
-from app.infrastructure.llm.open_api_sdk import consultar_ia
+from psycopg_pool import ConnectionPool
+
 from app.config.config import settings
+from app.infrastructure.persistence.db_connection import get_connection_pool
+from app.infrastructure.repositories.tenant_repository_adapter import TenantRepositoryAdapter
+from app.infrastructure.llm.open_api_sdk import consultar_ia
+from app.application.use_cases.find_tenant_use_case import FindTenantUseCase
 
 
-def get():
+def get(pool: ConnectionPool):
     """Retrieve the tenant."""
-    repository = TenantRepositoryAdapter()
-    result = FindTenantUseCase(repository).execute("818")
+    repository = TenantRepositoryAdapter(pool)
+    result = FindTenantUseCase(repository).execute("43001")
     print(result)
 
 
 if __name__ == "__main__":
-    get()
+    connection_pool = get_connection_pool()
+    get(connection_pool)
 
     payload = {
         "config": {

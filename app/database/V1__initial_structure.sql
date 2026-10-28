@@ -16,13 +16,11 @@ $$ LANGUAGE plpgsql;
 -- =====================================================
 CREATE TABLE tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code VARCHAR(50) NOT NULL,
     name VARCHAR(200) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'inactive')),
-    plan VARCHAR(50) DEFAULT 'free',
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED', 'INACTIVE')),
+    plan VARCHAR(50) DEFAULT 'FREE',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_tenants_code UNIQUE (code)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TRIGGER trg_tenants_updated BEFORE
 UPDATE ON tenants FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -31,12 +29,11 @@ CREATE TABLE channels (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     -- 'whatsapp', 'telegram', 'web'
-    type VARCHAR(30) NOT NULL DEFAULT 'whatsapp' CHECK (type IN ('whatsapp', 'telegram', 'web')),
+    type VARCHAR(30) NOT NULL DEFAULT 'WHATSAPP' CHECK (type IN ('WHATSAPP', 'TELEGRAM', 'WEB')),
     external_channel_id VARCHAR(50) NOT NULL,
-    display_name VARCHAR(50),
     -- datos específicos del canal
     config JSONB NOT NULL DEFAULT '{}',
-    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_channels_tenant_id UNIQUE (tenant_id, id),
@@ -50,7 +47,8 @@ CREATE TABLE tenant_settings (
     tenant_id UUID NOT NULL UNIQUE REFERENCES tenants(id),
     agent_name VARCHAR(100) DEFAULT 'Asistente',
     system_prompt TEXT NOT NULL DEFAULT 'Eres un asistente útil.',
-    chat JSONB NOT NULL DEFAULT '{
+    business_hours JSONB DEFAULT '{}'::jsonb,
+    chat_config JSONB NOT NULL DEFAULT '{
         "provider": "openai",
         "model": "gemini-3.5-flash-lite",
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
@@ -59,7 +57,7 @@ CREATE TABLE tenant_settings (
         "timeout": 20,
         "max_retries": 5
     }',
-    embedding JSONB NOT NULL DEFAULT '{
+    embedding_config JSONB NOT NULL DEFAULT '{
         "provider": "openai",
         "model": "text-embedding-3-small",
         "base_url": "https://otra.com",
@@ -68,7 +66,6 @@ CREATE TABLE tenant_settings (
         "similarity_threshold": 0.70,
         "language": "es"
     }',
-    business_hours JSONB DEFAULT '{}'::jsonb,
     extra_config JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -79,22 +76,61 @@ UPDATE ON tenant_settings FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
+    external_id UUID NOT NULL,
     email VARCHAR(255) NOT NULL,
     full_name VARCHAR(150) NOT NULL,
-    role VARCHAR(20) NOT NULL DEFAULT 'agent' CHECK (
-        role IN ('owner', 'admin', 'agent')
+    role VARCHAR(20) NOT NULL DEFAULT 'AGENT' CHECK (
+        role IN ('OWNER', 'ADMIN', 'AGENT')
     ),
-    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-    availability VARCHAR(20) NOT NULL DEFAULT 'offline' CHECK (
-        availability IN ('online', 'busy', 'away', 'offline')
-    ),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uq_users_tenant_id UNIQUE (tenant_id, id)
 );
+CREATE UNIQUE INDEX uq_users_external_id ON users (external_id);
 CREATE UNIQUE INDEX uq_users_tenant_email ON users (tenant_id, lower(email));
 CREATE TRIGGER trg_users_updated BEFORE
 UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+-- =====================================================
+CREATE TABLE tenant_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    user_id UUID NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'AGENT' CHECK (role IN ('OWNER', 'ADMIN', 'AGENT')),
+    availability VARCHAR(20) NOT NULL DEFAULT 'OFFLINE' CHECK (
+        availability IN ('ONLINE', 'BUSY', 'AWAY', 'OFFLINE')
+    ),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_tenant_users_tenant_user UNIQUE (tenant_id, user_id),
+    CONSTRAINT fk_tenant_users_tenant_user FOREIGN KEY (tenant_id, user_id) REFERENCES users(tenant_id, id)
+);
+CREATE INDEX idx_tenant_users_user ON tenant_users(user_id);
+CREATE TRIGGER trg_tenant_users_updated BEFORE
+UPDATE ON tenant_users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+-- =====================================================
+CREATE TABLE tenant_invitations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    email VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'AGENT' CHECK (role IN ('ADMIN', 'AGENT')),
+    -- Token aleatorio seguro enviado al email por el backend
+    token VARCHAR(64) NOT NULL,
+    invited_by_user_id UUID NOT NULL REFERENCES users(id),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (
+        status IN ('PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED')
+    ),
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_invitation_token UNIQUE (token),
+    CONSTRAINT fk_invitations_tenant_user FOREIGN KEY (tenant_id, invited_by_user_id) REFERENCES users(tenant_id, id)
+);
+CREATE INDEX idx_invitations_email_tenant ON tenant_invitations (lower(email), tenant_id);
+CREATE INDEX idx_invitations_token ON tenant_invitations (token);
+CREATE INDEX idx_invitations_tenant_invited_by_user_id ON conversations(tenant_id, invited_by_user_id);
+CREATE TRIGGER trg_tenant_invitations_updated BEFORE
+UPDATE ON tenant_invitations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 -- =====================================================
 -- CONVERSATIONS (conversaciones por empresa y cliente)
 -- =====================================================
@@ -102,30 +138,30 @@ CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     title VARCHAR(300) NOT NULL,
-    type VARCHAR(30) NOT NULL DEFAULT 'document' CHECK (
+    type VARCHAR(30) NOT NULL DEFAULT 'DOCUMENT' CHECK (
         type IN (
-            'document',
-            'faq',
-            'policy',
-            'product',
-            'url',
-            'other'
+            'DOCUMENT',
+            'FAQ',
+            'POLICY',
+            'PRODUCT',
+            'URL',
+            'OTHER'
         )
     ),
-    source_type VARCHAR(30) DEFAULT 'upload' CHECK (
-        source_type IN ('upload', 'url', 'manual', 'api')
+    source_type VARCHAR(30) DEFAULT 'UPLOAD' CHECK (
+        source_type IN ('UPLOAD', 'URL', 'MANUAL', 'API')
     ),
     source_url TEXT,
     file_path TEXT,
     mime_type VARCHAR(100),
     -- SHA-256 para detectar cambios
     content_hash VARCHAR(64),
-    ingestion_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (
-        ingestion_status IN ('pending', 'processing', 'ready', 'failed')
+    ingestion_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (
+        ingestion_status IN ('PENDING', 'PROCESSING', 'READY', 'FAILED')
     ),
     error_detail TEXT,
     metadata JSONB DEFAULT '{}'::jsonb,
-    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_documents_tenant_id UNIQUE (tenant_id, id)
@@ -164,8 +200,8 @@ CREATE TABLE conversations (
     channel_id UUID NOT NULL,
     customer_external_id VARCHAR(100) NOT NULL,
     customer_name VARCHAR(200),
-    status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (
-        status IN ('open', 'closed', 'handoff', 'archived')
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (
+        status IN ('OPEN', 'CLOSED', 'HANDOFF', 'ARCHIVED')
     ),
     assigned_user_id UUID,
     last_message_at TIMESTAMPTZ,
@@ -188,32 +224,32 @@ CREATE TABLE messages (
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     channel_id UUID NOT NULL,
     conversation_id UUID NOT NULL,
-    role VARCHAR(20) NOT NULL DEFAULT 'customer' CHECK (
-        role IN ('customer', 'assistant', 'system', 'human_agent')
+    role VARCHAR(20) NOT NULL DEFAULT 'CUSTOMER' CHECK (
+        role IN ('CUSTOMER', 'ASSISTANT', 'SYSTEM', 'HUMAN_AGENT')
     ),
-    message_type VARCHAR(20) NOT NULL DEFAULT 'text' CHECK (
+    message_type VARCHAR(20) NOT NULL DEFAULT 'TEXT' CHECK (
         message_type IN (
-            'text',
-            'image',
-            'audio',
-            'video',
-            'document',
-            'location',
-            'template',
-            'interactive'
+            'TEXT',
+            'IMAGE',
+            'AUDIO',
+            'VIDEO',
+            'DOCUMENT',
+            'LOCATION',
+            'TEMPLATE',
+            'INTERACTIVE'
         )
     ),
     content TEXT,
     media_url TEXT,
     external_message_id VARCHAR(200),
-    status VARCHAR(20) DEFAULT 'received' CHECK (
+    status VARCHAR(20) DEFAULT 'RECEIVED' CHECK (
         status IN (
-            'received',
-            'queued',
-            'sent',
-            'delivered',
-            'read',
-            'failed'
+            'RECEIVED',
+            'QUEUED',
+            'SENT',
+            'DELIVERED',
+            'READ',
+            'FAILED'
         )
     ),
     error_detail TEXT,
@@ -225,9 +261,8 @@ CREATE TABLE messages (
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_messages_tenant_id UNIQUE (tenant_id, id),
-    CONSTRAINT uq_messages_tennat_channel_external_message_id UNIQUE (tenant_id, channel_id, external_message_id),
-    CONSTRAINT fk_messages_tenant_channel FOREIGN KEY (tenant_id, channel_id) REFERENCES channels(tenant_id, id),
-    CONSTRAINT fk_messages_tenant_channel_conversation FOREIGN KEY (tenant_id, channel_id, conversation_id) REFERENCES conversations (tenant_id, channel_id, id)
+    CONSTRAINT uq_messages_tenant_conversation_external_message_id UNIQUE (tenant_id, conversation_id, external_message_id),
+    CONSTRAINT fk_messages_tenant_conversation FOREIGN KEY (tenant_id, conversation_id) REFERENCES conversations (tenant_id, id)
 );
 CREATE INDEX idx_messages_tenant_conversation_created ON messages(tenant_id, conversation_id, created_at DESC);
 -- =====================================================
@@ -292,8 +327,8 @@ SELECT n.id,
 FROM nearest n
     JOIN documents d ON d.tenant_id = p_tenant_id
     AND d.id = n.document_id
-WHERE d.ingestion_status = 'ready'
-    AND d.status = 'active'
+WHERE d.ingestion_status = 'READY'
+    AND d.status = 'ACTIVE'
     AND 1 - n.distance >= p_min_similarity
 ORDER BY n.distance
 LIMIT p_match_count;
