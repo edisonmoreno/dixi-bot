@@ -1,8 +1,9 @@
 import pandas as pd
 import streamlit as st
 
-from application.fabric import get_tenant_use_case
+from application.container import build_tenant_use_case
 
+tenant_use_case = build_tenant_use_case()
 STATUS_LABELS = {
     "ACTIVE": "Activo",
     "SUSPENDED": "Suspendido",
@@ -24,11 +25,11 @@ def reset_page():
 
 def open_tenant_form(page_tenants):
     click = st.session_state.tenant_edit_button
-    st.session_state.tenant_form_code = page_tenants[click.row]["code"]
+    st.session_state.tenant_form_code = page_tenants[click.row].id
 
 
 st.session_state.setdefault("tenant_page_generation", 0)
-tenants = get_tenant_use_case().find_all()
+tenants = tenant_use_case.find_all()
 
 header_columns = st.columns([5, 1], vertical_alignment="center")
 with header_columns[0].container(
@@ -42,7 +43,7 @@ with header_columns[0].container(
             type="primary",
             width="stretch"):
         st.switch_page(
-            "pages/platform/tenants_form.py",
+            "infrastructure/web/pages/platform/tenants_form.py",
             query_params={},
         )
 
@@ -127,7 +128,7 @@ if page_tenants:
     tenant_code_to_edit = st.session_state.pop("tenant_form_code", None)
     if tenant_code_to_edit:
         st.switch_page(
-            "pages/platform/tenants_form.py",
+            "infrastructure/web/pages/platform/tenants_form.py",
             query_params={"code": tenant_code_to_edit},
         )
 else:

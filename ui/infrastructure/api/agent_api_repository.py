@@ -1,14 +1,19 @@
 from dataclasses import asdict
 import httpx
 from domain.model.agent_model import Agent, AgentSettings
+from infrastructure.api.api_config_model import ApiConfig
 
 
 class AgentApiRepository:
-    def __init__(self, endpoint_url: str):
-        self._endpoint_url = endpoint_url
+    def __init__(self, api_config: ApiConfig):
+        self._api_config = api_config
 
     def get_by_id(self, agent_id: str) -> Agent:
-        response = httpx.get(self._endpoint_url, timeout=30)
+        response = httpx.get(
+            url=self._api_config.url,
+            headers=self._api_config.headers,
+            timeout=self._api_config.timeout
+        )
         response.raise_for_status()
 
         payload = response.json()
@@ -41,8 +46,9 @@ class AgentApiRepository:
 
     def save(self, agent: Agent) -> None:
         response = httpx.put(
-            self._endpoint_url,
-            json={"data": asdict(agent)},
-            timeout=30,
+            url=self._api_config.url,
+            headers=self._api_config.headers,
+            timeout=self._api_config.timeout,
+            json={"data": asdict(agent)}
         )
         response.raise_for_status()

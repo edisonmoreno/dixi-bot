@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     # Application
     url_host: HttpUrl
+    url_api_key: SecretStr
+    url_timeout_seconds: int
 
     # Le indicamos a Pydantic que extraiga los valores desde el archivo .env
     model_config = SettingsConfigDict(

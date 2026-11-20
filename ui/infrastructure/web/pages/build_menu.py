@@ -10,7 +10,7 @@ def build_pages(site_type: str, role: str):
     if site_type == "ADMIN":
         pages["Plataforma"] = [
             st.Page(f"{PAGE_PREFIX}/platform/tenants.py", title="Clientes",
-                    icon=":material/store:"),
+                    icon=":material/tenancy:"),
             st.Page(f"{PAGE_PREFIX}/platform/tenants_form.py", title="Formulario de cliente",
                     url_path="cliente-formulario", visibility="hidden"),
             st.Page(f"{PAGE_PREFIX}/platform/usage.py", title="Uso y consumo",

@@ -1,8 +1,9 @@
 import streamlit as st
 import httpx
 from domain.model.agent_model import Agent, AgentSettings
-from application.fabric import get_agent_use_case
+from application.container import build_agent_use_case
 
+agent_use_case = build_agent_use_case()
 TONES = ["Profesional", "Amigable", "Casual", "Formal", "Informal",
          "Divertido", "Serio", "Creativo", "Empático", "Optimista"]
 LANGUAGES = {"es": "Español",
@@ -13,7 +14,7 @@ PROVIDERS = {"openai": "OpenAI",
              "google_genai": "Google"}
 
 try:
-    agent_model = get_agent_use_case().get_by_id(agent_id="1")
+    agent_model = agent_use_case.get_by_id(agent_id="1")
 except (httpx.HTTPError, ValueError) as error:
     st.error(f"No se pudo cargar el agente: {error}")
     st.stop()
@@ -62,9 +63,8 @@ with col2:
         filter_mode=None,
     )
 
-with st.container(border=True):
-    st.subheader("Configuración del modelo")
-
+(model_tab,) = st.tabs(["Configuración del modelo"])
+with model_tab:
     col1, col2 = st.columns(2)
     with col1:
         current_provider = agent_model.settings.provider
