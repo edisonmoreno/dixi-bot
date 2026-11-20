@@ -3,6 +3,7 @@ openai>=1.0.0
 
 # Datos
 pandas
+
 # leer/escribir Excel
 openpyxl
 
@@ -15,3 +16,6 @@ streamlit[auth]
 streamlit-cookies-controller
 
 toml
+
+# WebClient
+httpx

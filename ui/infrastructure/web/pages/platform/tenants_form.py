@@ -6,7 +6,7 @@ from datetime import date, time
 import pandas as pd
 import streamlit as st
 
-from pages.platform.tenant_demo_data import DEFAULT_SETTINGS, get_demo_tenants
+from ui.infrastructure.web.pages.platform.tenant_demo_data import DEFAULT_SETTINGS, get_demo_tenants
 
 
 STATUS_LABELS = {

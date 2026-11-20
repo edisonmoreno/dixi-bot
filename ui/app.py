@@ -1,17 +1,11 @@
 import os
 import urllib.parse
 import streamlit as st
-import streamlit.components.v1 as components
 import toml
-import time
-import requests
-import json
 from utils.cookies import get_user_cookie, set_user_cookie, delete_user_cookie
-from services.auth_service import decode_token
-from services.auth_service import exchange_code
-from components.buttons import redirect_button, redirect_logout
-from pages.build_menu import build_pages, page_profile, page_logout
-from services.auth_service import logout
+from infrastructure.auth_service import decode_token, exchange_code
+from infrastructure.web.components.buttons import redirect_button, redirect_logout
+from infrastructure.web.pages.build_menu import build_pages, page_profile, page_logout
 
 st.logo(
     image="https://a.favicon.im/reddit.com",
@@ -45,11 +39,11 @@ COOKIE_SESSION = "dixi_session"
 headers = st.context.headers
 host = headers.get("Host", "")
 domain = host.split(":")[0]
-secret_file = "secrets_app.toml"
+secret_file = "config_web_app.toml"
 site_type = "APP"
 
 if domain.startswith("admin."):
-    secret_file = "secrets_admin.toml"
+    secret_file = "config_web_admin.toml"
     site_type = "ADMIN"
 
 secret_path = os.path.abspath(os.path.join(SECRETS_DIR, secret_file))

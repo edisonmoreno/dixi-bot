@@ -1,0 +1,4 @@
+# Configuración para ssl de https
+[server]
+sslCertFile = "ui/certs/dixibot-https-cert.pem"
+sslKeyFile = "ui/certs/dixibot-https-key.pem"

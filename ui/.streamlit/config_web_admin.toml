@@ -5,8 +5,6 @@ client_secret = "fskvtmu3dlovv806ejkmpm030df4qquvbqbd4jtv82h8b3vshm"
 redirect_uri = "https://admin.dixibot.local:8501"
 scope = "email openid profile"
 
-
-
 [auth]
 redirect_uri = "http://localhost:8501/oauth2callback"
 cookie_secret = "un_string_muy_largo_y_totalmente_aleatorio_de_seguridad_123456"

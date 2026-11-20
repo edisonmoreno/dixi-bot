@@ -1,13 +1,20 @@
 import pandas as pd
 import streamlit as st
 
-from pages.platform.tenant_demo_data import get_demo_tenants
-
+from application.fabric import get_tenant_use_case
 
 STATUS_LABELS = {
     "ACTIVE": "Activo",
     "SUSPENDED": "Suspendido",
     "INACTIVE": "Inactivo",
+}
+PLANS_LABELS = {
+    "FREE": "Gratis",
+    "BETA_TESTER": "Beta",
+    "BELIEVERS": "Creyentes",
+    "BASIC": "Básico",
+    "PRO": "Profesional",
+    "ENTERPRISE": "Empresarial"
 }
 
 
@@ -21,27 +28,23 @@ def open_tenant_form(page_tenants):
 
 
 st.session_state.setdefault("tenant_page_generation", 0)
-tenants = get_demo_tenants()
-
-available_plans = sorted({tenant["plan"] for tenant in tenants})
+tenants = get_tenant_use_case().find_all()
 
 header_columns = st.columns([5, 1], vertical_alignment="center")
 with header_columns[0].container(
-    horizontal=True,
-    vertical_alignment="center",
-    gap="small",
-):
+        horizontal=True,
+        vertical_alignment="center",
+        gap="small"):
     st.title("Clientes")
-    st.badge(f"{len(tenants)} clientes", color="gray")
-if header_columns[1].button(
-    ":material/add_circle: Nuevo cliente",
-    type="primary",
-    width="stretch",
-):
-    st.switch_page(
-        "pages/platform/tenants_form.py",
-        query_params={},
-    )
+
+    if header_columns[1].button(
+            ":material/add_circle: Nuevo cliente",
+            type="primary",
+            width="stretch"):
+        st.switch_page(
+            "pages/platform/tenants_form.py",
+            query_params={},
+        )
 
 filter_columns = st.columns([5, 1, 1], vertical_alignment="bottom")
 filter_columns[0].text_input(
@@ -61,8 +64,10 @@ filter_columns[1].selectbox(
 )
 filter_columns[2].selectbox(
     "Plan",
-    options=["Todos", *available_plans],
-    format_func=lambda plan: plan,
+    options=["Todos", *PLANS_LABELS],
+    format_func=lambda plan: (
+        "Todos" if plan == "Todos" else PLANS_LABELS[plan]
+    ),
     key="tenant_plan_filter",
     on_change=reset_page,
 )
@@ -73,9 +78,9 @@ plan_filter = st.session_state.tenant_plan_filter
 visible_tenants = [
     tenant
     for tenant in tenants
-    if search in f'{tenant["name"]} {tenant["code"]}'.casefold()
-    and (status_filter == "Todos" or tenant["status"] == status_filter)
-    and (plan_filter == "Todos" or tenant["plan"] == plan_filter)
+    if search in f'{tenant.name}'.casefold()
+    and (status_filter == "Todos" or tenant.status == status_filter)
+    and (plan_filter == "Todos" or tenant.plan == plan_filter)
 ]
 
 page_size = st.session_state.get("tenant_page_size", 5)
@@ -91,11 +96,10 @@ if page_tenants:
     table_data = pd.DataFrame(
         [
             {
-                "Organización": tenant["name"],
-                "Código": tenant["code"],
-                "Estado": STATUS_LABELS[tenant["status"]],
-                "Plan": tenant["plan"],
-                "Creado en": tenant['created_at'],
+                "Organización": tenant.name,
+                "Estado": STATUS_LABELS[tenant.status],
+                "Plan": PLANS_LABELS[tenant.plan],
+                "Creado en": tenant.created_at,
                 "Editar": ":material/edit: Editar",
             }
             for tenant in page_tenants
@@ -103,7 +107,7 @@ if page_tenants:
     )
     table_key = (
         f"tenant_table_{current_page}_"
-        f"{'_'.join(tenant['code'] for tenant in page_tenants)}"
+        f"{'_'.join(tenant.id for tenant in page_tenants)}"
     )
     st.dataframe(
         table_data,
